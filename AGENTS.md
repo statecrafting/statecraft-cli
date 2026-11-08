@@ -157,10 +157,12 @@ governance check before it lands.** Two properties are needed for that, and they
 are independent. Conflating them is easy and was done here once already.
 
 **Freshness**: the checks ran against a candidate reconciled with the current
-`main`. Enforced by branch protection, which requires a branch to be up to date
-before merging. How a branch becomes up to date is not prescribed: rebase,
-merge, or the forge's own update button all satisfy it, and the one to prefer is
-whichever keeps history legible for the change at hand.
+`main`. Enforced by the merge queue (below), which builds each entry on the
+latest base, including the entries ahead of it, before it lands. Branch
+protection therefore does not require a branch to be up to date (owner,
+2026-11-07; profile revision 28, spec 072). A pull request that conflicts with
+`main`, or that the queue removes, is rebased onto `main` in its worktree and
+queued again.
 
 **Comparison scope**: the check evaluated *this* candidate's changes and no
 others. Enforced by which two commits the check is given, not by freshness.

@@ -16,7 +16,7 @@
       "contentHash": "eafa127b7b1ceef24840bccaabf37089251f7a38ceb97bf66a97577df2144bdb"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "8b29128bc1ef689039bda17fee6e27c82c085838fa35fa280e7381584674fc17"
+      "contentHash": "137603abf7f4b3ee93121fb1c4288615391bd32d82c192bf2b6939e892144b2f"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "25804a34fd85499417dd5f7002cced0b588cefb581606f8e8235bbf827deeb9e"
@@ -25,7 +25,7 @@
       "contentHash": "5823bcab2aa6a978d056ae2d5da426fde28dc9ed4f6f14e200b4056d98f241f9"
     },
     "AGENTS.md": {
-      "contentHash": "37e5c4c8ff8e34f48935af78a0cf1a168a6a413577ba77511706182d5c9dff15"
+      "contentHash": "6164ab41dd55ef4fc8adef1027c6b0947168d166ed1d5e1bbb0c546bbe3ce9b3"
     },
     "CLAUDE.md": {
       "contentHash": "91201e4cf012d924ba3462d1d49842438503ad685a7cf7e25f1ccdb37649d59a"
@@ -100,22 +100,22 @@
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
     "scripts/statecraft/ai-review.sh": {
-      "contentHash": "52c74d642fb66e307416fdce60177827f9964c5c5a7f41d74653abe2ccad875f"
+      "contentHash": "c010f98615a08c93222ee5429e6e9c0b9bb1ce0585fb87d79f20fe2475a21d77"
     },
     "scripts/statecraft/ci-gate.sh": {
-      "contentHash": "65ba25523c01008941d0069d160d5886c1db5f6ea35165fa44b5c947ed143c2e"
+      "contentHash": "e6b27b4952607c8a3d25bdb9d7b94372466d428eb97321fd50bbf5902a0bb9ff"
     },
     "scripts/statecraft/gate.sh": {
-      "contentHash": "82666844b69637c9ae071ec55053758b4bf929e20bed5947dd7f71f6faa4f872"
+      "contentHash": "2149c88bae439866a90ddaf5980af3e29a05db06dba51d8b10998f9888a42381"
     },
     "scripts/statecraft/guard-policy-files.sh": {
-      "contentHash": "8a4fad8ff1c689f817cc4ed813561101aaed2ec821b1cc78286ea8807b8f4d7f"
+      "contentHash": "1b6b28dc3452b62f33167d5111f1300617176fc08d1e9603d623aff25685d36d"
     },
     "scripts/statecraft/install-spec-spine.sh": {
-      "contentHash": "b8cae67109d6da42532f3336cb1255b6b2166d5ef37597ab93ef3f191636cfde"
+      "contentHash": "5506048307fad7d992cfbd60354b9b9d2ce6949661772510219b2d4c1cb0fa8b"
     },
     "scripts/statecraft/verify-action-pins.sh": {
-      "contentHash": "a6ab00e319b98feb58df0b789fc2a0797be044d4e995821d9381dea4fbbab528"
+      "contentHash": "958e75ff55fc7a808ad877b4a828259c3b4b89c2a9a95347eddecc51c1366060"
     },
     "spec-spine.toml": {
       "contentHash": "af59e17ab20a93f015369890a862b58e96577009d2b5a98d5d256c55ef067c42"
