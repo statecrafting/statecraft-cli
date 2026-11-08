@@ -36,7 +36,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 27;
+pub const REVISION: u32 = 28;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -136,6 +136,10 @@ pub const ANSWERED_SINCE: u32 = 26;
 /// The revision whose policy-isolation guard ignores a Cargo.toml or
 /// Cargo.lock that changes only workspace package versions (spec 071).
 pub const VERSION_ONLY_SINCE: u32 = 27;
+/// The revision whose policy-isolation guard ignores a self-pinned
+/// spec-spine.toml and the spec.md that owns a changed policy file, and whose
+/// remote obligations no longer ask for branches up to date (spec 072).
+pub const OWNING_SPEC_SINCE: u32 = 28;
 /// What `ci.code.free_disk` removes: preinstalled toolchains a Rust build
 /// never reads (spec 069 section 3.2). Fixed by the profile.
 pub const FREE_DISK_COMMAND: &str = "sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true";
@@ -469,7 +473,7 @@ pub fn remote_obligations() -> Vec<String> {
     vec![
         "Settings, Actions: Actions enabled; the workflow token read-only by default".to_string(),
         format!("the secret {PREFERRED_CREDENTIAL} or {CREDENTIAL} visible to the repository, set by the operator ({CREDENTIAL_COMMAND}, or gh secret set {PREFERRED_CREDENTIAL}); the review uses {PREFERRED_CREDENTIAL} when it is set and {CREDENTIAL} otherwise (revision 8), and neither value is ever in a log, a file or a message"),
-        format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
+        format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}); branches up to date is not required, because a required merge queue tests each entry on the latest base and, without one, ci-gate judges the pull request's head"),
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
         format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), a pull request that changes the authority set (revision 5), and a pull request that ratifies a spec (revision 12)"),
         "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)".to_string(),
@@ -497,6 +501,7 @@ pub fn remote_obligations() -> Vec<String> {
         format!("revision 25: the setup parameter ci.code.free_disk, a boolean and false by default, renders one step in the managed code job before the build that prints df -h /, runs `{FREE_DISK_COMMAND}` and prints df -h / again, never failing the job; on a post-merge push it runs only when the cargo key missed; beside an external ci.code it refuses the plan, and off, the workflow is revision 24's (spec 069)"),
         "revision 26: every finding of the AI review carries a severity (low, medium or high) and a category (correctness, security, authority, ratification or other), a missing or unknown one read as high, and an id, the first twelve hex digits of the sha256 of its path, line and summary; a pull request whose findings are all low and other, each answered by a `Review note (<sha8>): <id>` line of its body for that head, last edited by its author or by someone with write access, needs no owner exception, in the pull request and in the merge queue; statecraft-ci also runs on an edited pull request, and keeps the review recorded for that head, base and pull request rather than reviewing again (spec 068)".to_string(),
         "revision 27: the policy-isolation guard gives a Cargo.toml or Cargo.lock a fourth class, version-only, when both revisions hold it and it is unchanged once every workspace package's version is masked (Cargo.toml's [package] or [workspace.package] version and the version of an inline table that also names a path; Cargo.lock's version of a [[package]] without a source); like generated paths it is ignored, so a release bump beside its changelog and re-blessed fixtures is one pull request, while any dependency, source or lockfile-format change keeps the file policy (spec 071)".to_string(),
+        "revision 28: the policy-isolation guard ignores spec-spine.toml as version-only when both revisions hold it, its only change is required_version, and the head pins the version its root Cargo.toml declares for the workspace (a repository that pins itself), and ignores a spec.md whose front matter names, quoted, a policy path the change also changes (the owning spec the coupling gate requires beside it); a consumer's pin move and every other path keep their class. The obligations no longer ask for branches up to date, and the gate's comments no longer assume merge commits (spec 072)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }

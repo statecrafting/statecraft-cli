@@ -1,0 +1,39 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "072-self-pin-and-owning-spec",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "727d0496e4879b100ec89efafb7400ae963f07b1f317cfed83a124382c7de87a"
+}

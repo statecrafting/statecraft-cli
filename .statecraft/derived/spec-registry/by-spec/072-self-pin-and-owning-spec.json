@@ -1,0 +1,86 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class"
+    ],
+    "created": "2026-11-07",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "072-self-pin-and-owning-spec",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-a-repository-that-pins-itself",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "spec-spine.toml is version-only when both the merge base and the head hold it, the two copies are equal once the required_version line is masked, and the head's required_version, less a leading `=`, equals the version the head's root Cargo.toml declares in [workspace.package] or [package]."
+      },
+      {
+        "anchor": "3-2-the-owning-spec",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A changed spec.md is the owning spec, ignored like a generated path, when its front matter, the lines between an opening `---` and the next `---`, contains a policy path of this change that is not version-only, in double or single quotes; any other spec.md is other."
+      },
+      {
+        "anchor": "3-3-the-remote-obligations-and-the-comments",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The remote obligations do not require branches up to date, and the profile's gate and workflow comments do not assume merge commits."
+      },
+      {
+        "anchor": "3-4-exits-and-report",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The guard's exits and its merge-base comparison are spec 044's; its summary line also counts the owning-spec paths."
+      }
+    ],
+    "sectionDigests": {
+      "072-setup-profile-revision-28-the-policy-isolation-guard-ignores-a-self-pin-and-the-owning-spec": "b89d497da96bc9b03862a32550acf2b7bd17088d0b70823931c7c530ceba9efa",
+      "1-purpose": "2d192316bcd6d4845a5d113386f5f238635b7a7614df52d3a70aedda2b0caff7",
+      "2-territory": "39eb333e763cc3004d867e2e4ecbe6a3053aa7c44cff541580542617fc641412",
+      "3-1-a-repository-that-pins-itself": "2ce4928eb6fc4382a09292aa4769d557d871251074c08828fddc77f98d3f2e7a",
+      "3-2-the-owning-spec": "9bb1accbab7c5a876b3f7a7264b4c3cecb0ae86d4c6aa07f2258262e879962d0",
+      "3-3-the-remote-obligations-and-the-comments": "3d13dbada47b8c81fa3b3522156651e8dbbb9fc861d426765e4ad0ec4d14a99d",
+      "3-4-exits-and-report": "dd381e10f35fb80eb5c8be973d05c5e974b11ff9fa7bbb8f934a8d0aff62217b",
+      "3-behavior": "56ae7a9ed63a281ddc7c61dc9212613e25012e48290d56342fc225b3460da0fe",
+      "4-observable-cases": "0a08870892aa8d386f3e804ad1881cb5ef9e1bd65593aa8a43d06e93d91fdb4f",
+      "5-resolved-decisions": "ce0393519cf30345adaaae119993f026ebd0682a0a79a83a57b6a6f6412c0dba",
+      "verification": "12e91f7443f9f8772caf198bb36861a7fbaa9807199c2618eea7be40b0abaa1d"
+    },
+    "sectionHeadings": [
+      "072: Setup profile revision 28: the policy-isolation guard ignores a self-pin and the owning spec",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 A repository that pins itself",
+      "3.2 The owning spec",
+      "3.3 The remote obligations and the comments",
+      "3.4 Exits and report",
+      "4. Observable cases",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/072-self-pin-and-owning-spec/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 044 section 3.3, spec 071 and spec 002's setup profile. A repository that pins spec-spine to its own version, as spec-spine does, moves spec-spine.toml with every release, so its release bump stays mixed under revision 27; and a policy file that a spec claims needs that spec's spec.md beside it under the coupling gate, which the guard calls other. Revision 28 treats a self-pin move as version-only and a spec.md whose front matter names a changed policy path as an ignored owning spec. It also drops \"branches up to date\" from the remote obligations and the gate's comments that assumed merge commits.\n",
+    "title": "Setup profile revision 28: the policy-isolation guard ignores a self-pin and the owning spec"
+  },
+  "shardHash": "727d0496e4879b100ec89efafb7400ae963f07b1f317cfed83a124382c7de87a",
+  "specVersion": "1.11.0"
+}

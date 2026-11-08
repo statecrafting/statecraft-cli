@@ -167,7 +167,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: sh "${STATECRAFT_GATE:?}" governance
-      # Revision 4, rule 3: the title and body become the merge commit's
+      # Revision 4, rule 3: the title and body become the landed commit's
       # message (governance.authored_content_text).
       - name: Authored-content rules (title and body)
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
