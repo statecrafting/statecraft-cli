@@ -1,7 +1,7 @@
 ---
 id: "070-writable-alias-scan"
 title: "A read-only root refuses only a link the child could write"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-06"
 summary: >
@@ -104,7 +104,8 @@ link planted inside the exempted directory.
 
 ## Verification
 
-Acceptance is run through `make verify SPEC=070`, against fixture trees and the
+Ratified by the owner on 2026-11-08. Acceptance is run through
+`make verify SPEC=070`, against fixture trees and the
 platform boundary, with no provider.
 
 ```verify:cli
