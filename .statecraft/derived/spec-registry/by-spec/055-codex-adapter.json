@@ -28,7 +28,7 @@
       }
     ],
     "id": "055-codex-adapter",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-5-qualification",
@@ -65,7 +65,7 @@
       }
     ],
     "sectionDigests": {
-      "055-codex-adapter": "152e6a2fb4bab8ad5a9d07af5df8bf7443f43e91ccc3c6ea4e6edb7adf0f10e4",
+      "055-codex-adapter": "93e0fd90df7e3167152fd89f54efe8e6656f8ac33e3d561ab29c3132e33baba0",
       "1-purpose": "6a4f005f9808852cca4ba75fbafa0e740eba3bc704fd2d777dfa22c7ded386d7",
       "2-territory": "8276594af303e1f3bef47e9eaed0929e79045f764644c9a9fc6bfbcfd0c804ba",
       "3-1-what-is-spawned": "fe1c7b63244076dddd9756078170566b5d598ead08ce7c5cb5fde45ec24c39d1",
@@ -76,7 +76,7 @@
       "3-6-declared-capabilities": "15048d90ead9ee81d0d9ef2e230f57f83403729aff871bb52c8f4310685b0474",
       "3-behavior": "a1190ad613e5133fab9574d6e66938f5acd50fae6211e5018d3c239a31ae667c",
       "4-out-of-scope": "c3555e5aa9d1b68a154974a682f95c496c6322ab491a2c8b6b9930b0712c2087",
-      "5-resolved-decisions": "4efa833af5da1c328dd02a40b63c560ff3b70d8737a92ebc2dce824ed0ec1315",
+      "5-resolved-decisions": "64c8ad6292f3c926cde7cec258a58f52b6752da8fa9b52f533e2547eab0a5c16",
       "appendix-a-other-harnesses-reference-only": "a39b9295d2aa85a10216b7807fc641cc76bacf038e9964811db5976c981057e7",
       "verification": "2679579f4d94ff6fbb6705d74fb0134d082a56a7af4c34cbaea70a847e05135f"
     },
@@ -101,6 +101,6 @@
     "summary": "Proposes statecraft-adapter-codex, the second provider adapter under the conditional F-07 lift of 2026-10-20. It mirrors the Claude Code adapter's shape: codex exec's JSONL stream mapped to spec 003's closed outcomes, a constructed environment, a per-run CODEX_HOME in the spirit of spec 042, and harness delivery under spec 008 without touching the user's own Codex configuration. It declares its capabilities through the seam proposed as spec 047 and is built only after that seam merges. It is qualified only by its own pass of spec 004's negative suite on fixtures recorded from a named Codex version. An appendix records preloop's facts on other harnesses as reference for later adapters; no code.\n",
     "title": "A Codex adapter, built on the capability seam and admitted only by its own pass of spec 004's suite"
   },
-  "shardHash": "6767558f3d0d0862f61117f0c9e4b1289154a730bee1c1bbb7f098fb69983d76",
+  "shardHash": "25196dc89eb34cd8c6b5882d8311795d1bd864d823d987d5885764f72b3244c9",
   "specVersion": "1.11.0"
 }

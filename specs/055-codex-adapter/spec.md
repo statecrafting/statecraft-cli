@@ -2,7 +2,7 @@
 id: "055-codex-adapter"
 title: "A Codex adapter, built on the capability seam and admitted only by its own pass of spec 004's suite"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Proposes statecraft-adapter-codex, the second provider adapter under the
@@ -240,6 +240,37 @@ is 0.166.0. No spec 047 field is flipped: these recordings measure the stream
 and the hook listing, not a declared field, so the adapter stays
 `unqualified` and `run` still refuses it until section 3.6's measurements and
 the managed policy exist.
+
+**2026-11-08: section 3.6 measured on codex-cli 0.166.0, and two fields
+flipped.** The probes are recorded under `testdata/probe/`, made on the
+owner's ChatGPT sign-in with an environment of `HOME` (an empty scratch
+directory), `PATH` and a per-run `CODEX_HOME` only.
+
+- `per_run_config_dir` is `true`. A turn ran from the per-run directory alone.
+  Afterwards its thread id was in that directory and in no file under the
+  user's `~/.codex`, the scratch `HOME` was still empty, and the credential was
+  byte-identical. That before-and-after reading of the user's Codex directory
+  is the live one the Verification paragraph names.
+- `settings_file_transport` is `true`. Spec 047 asks for a settings document
+  read from a file path the supervisor supplies. Codex reads `config.toml` at
+  the path the supervisor chooses, `CODEX_HOME`, rather than at a command-line
+  path. Two probes show it: an unknown key refused under `--strict-config`, in
+  an error naming that file, and a known key's value appearing in the session
+  record.
+- `print_mode_hooks` stays `false`. `codex exec` runs a `PreToolUse` command
+  hook and honours its block. Its `--json` stream, though, holds no event for
+  the blocked action, which is reported only on standard error, so the field's
+  second half is not met. The probe bypassed hook trust for itself only; the
+  adapter never does.
+- `stream_witness`, `wire_sidecar` and `version_field` are unchanged.
+
+A plain `run` launch now fits the declaration. A managed one is still refused
+with `capability-undeclared` naming `print_mode_hooks`. The managed hook answer
+stays derived until the operator installs the managed policy (2026-10-31).
+Qualification under section 3.5 is a separate record, so the adapter runs
+labelled `unqualified` until one exists. With the declaration measured and
+every Verification command passing, `implementation` is `complete`. The
+owner approved this on 2026-11-08.
 
 ## Appendix A: other harnesses (reference only)
 
