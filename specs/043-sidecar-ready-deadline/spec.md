@@ -2,7 +2,7 @@
 id: "043-sidecar-ready-deadline"
 title: "The witness sidecar's ready deadline starts when its process starts"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends 013 so the supervisor's ready deadline measures the producer's own
@@ -239,6 +239,29 @@ The values stay 60 and 20 seconds: the largest observed interval is 0.62
 seconds. `x86_64-unknown-linux-gnu` is not measured: this host can run it
 only emulated, which is not that platform, so `implementation` stays
 `pending` until a native x86_64 run is entered here.
+
+**2026-11-08: the x86_64 half of M-2, measured natively; the values stand.**
+The same harness, unchanged, ran on a GitHub-hosted `ubuntu-24.04` runner:
+Linux 7.0.0-1017-azure, `x86_64-unknown-linux-gnu`, AMD EPYC 7763, 4 vCPUs,
+with Landlock among the active security modules. The producer was the
+wire-witness 0.1.0 release for that target, its archive and executable checked
+against the ledger's two digests before use. The cases and the load are those
+of the 2026-11-01 entry, 20 attempts each; every attempt reached `ready`, none
+was refused and the observation was available in every one. Milliseconds,
+median / p95 / max:
+
+| Platform | Case | Spawn to observation | Observation to `ready` |
+|---|---|---|---|
+| Linux 7.0.0, x86_64 (EPYC 7763, 4 vCPUs), Landlock | fresh, idle | 30 / 31 / 31 | 4.3 / 5.6 / 6.3 |
+| | warm, idle | 30 / 31 / 31 | 4.1 / 210 / 295 |
+| | fresh, loaded | 141 / 169 / 189 | 18.8 / 38.7 / 40.8 |
+| | warm, loaded | 136 / 177 / 194 | 22.9 / 32.2 / 34.4 |
+
+As on aarch64 Linux, fresh and warm do not differ, so no assessment of a newly
+placed file is visible, and the observation works under Landlock. The largest
+interval in either phase is 0.30 seconds, so `START_TIMEOUT` stays 60 seconds
+and `READY_TIMEOUT` 20 seconds. With M-1 and both targets of M-2 entered,
+`implementation` is `complete`.
 
 ## Verification
 
