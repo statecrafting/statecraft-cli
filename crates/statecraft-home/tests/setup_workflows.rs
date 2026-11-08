@@ -5964,7 +5964,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 27, "the registered profile is revision 27");
+    assert_eq!(p.revision, 28, "the registered profile is revision 28");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -6941,6 +6941,126 @@ fn the_policy_guard_ignores_a_workspace_version_bump() {
     let (code, out) = run_script(root, guard, &["main", "added"]);
     assert_eq!(code, 1, "{out}");
     assert!(out.contains("policy:\n  crates/b/Cargo.toml\n"), "{out}");
+}
+
+#[test]
+fn the_policy_guard_ignores_a_self_pin_and_the_owning_spec() {
+    // Spec 072: revision 28.
+    let guard = "guard-policy-files.sh";
+    let repo = guard_repo();
+    let root = repo.path();
+    let pin = |v: &str| {
+        format!("[meta]\nrequired_version = \"={v}\"\n\n[manifest]\nmetadata_namespace = \"x\"\n")
+    };
+    let base: Vec<(&str, String)> = workspace_files("0.5.0", "1.0.200")
+        .into_iter()
+        .chain([("spec-spine.toml", pin("0.5.0"))])
+        .collect();
+    let commit = |root: &Path, all: &[(&str, String)]| {
+        let refs: Vec<(&str, &str)> = all.iter().map(|(p, t)| (*p, t.as_str())).collect();
+        commit_files(root, &refs);
+    };
+    commit(root, &base);
+    let spec = |claim: &str| {
+        format!(
+            "---\nid: \"9-x\"\nextends:\n  - {{ spec: \"1-y\", unit: {{ kind: file, path: {claim} }} }}\n---\n\n# 9\n"
+        )
+    };
+
+    // A release that moves the self-pin with the workspace, beside its spec and
+    // changelog: spec-spine.toml is version-only, exit 0.
+    git(root, &["checkout", "--quiet", "-b", "release", "main"]);
+    let mut all: Vec<(&str, String)> = workspace_files("0.6.0", "1.0.200").into_iter().collect();
+    all.push(("spec-spine.toml", pin("0.6.0")));
+    all.push(("specs/9-x/spec.md", spec("\"spec-spine.toml\"")));
+    all.push(("CHANGELOG.md", "0.6.0\n".into()));
+    commit(root, &all);
+    let (code, out) = run_script(root, guard, &["main", "release"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("0 policy, 0 generated (ignored), 2 other, 4 version-only (ignored), 0 owning spec (ignored)"), "{out}");
+
+    // A consumer's pin moves to another tool's version: policy, exit 1.
+    git(root, &["checkout", "--quiet", "-b", "consumer", "main"]);
+    commit(
+        root,
+        &[
+            ("spec-spine.toml", pin("0.33.0")),
+            ("src/x.rs", "\n".into()),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "consumer"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  spec-spine.toml\n"), "{out}");
+
+    // The pin moves with the workspace, but another line changes too: policy.
+    git(root, &["checkout", "--quiet", "-b", "pin-and-more", "main"]);
+    let mut all: Vec<(&str, String)> = workspace_files("0.6.0", "1.0.200").into_iter().collect();
+    all.push(("spec-spine.toml", pin("0.6.0").replace("\"x\"", "\"y\"")));
+    all.push(("CHANGELOG.md", "0.6.0\n".into()));
+    commit(root, &all);
+    let (code, out) = run_script(root, guard, &["main", "pin-and-more"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  spec-spine.toml\n"), "{out}");
+
+    // A policy change with the spec that claims it, quoted: exit 0.
+    git(root, &["checkout", "--quiet", "-b", "owned", "main"]);
+    commit(
+        root,
+        &[
+            ("deny.toml", "[advisories]\nignore = []\n".into()),
+            ("specs/9-x/spec.md", spec("'deny.toml'")),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "owned"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("1 policy, 0 generated (ignored), 0 other, 0 version-only (ignored), 1 owning spec (ignored)"), "{out}");
+
+    // The same with a source file: still mixed, exit 1.
+    git(
+        root,
+        &["checkout", "--quiet", "-b", "owned-and-source", "main"],
+    );
+    commit(
+        root,
+        &[
+            ("deny.toml", "[advisories]\nignore = []\n".into()),
+            ("specs/9-x/spec.md", spec("\"deny.toml\"")),
+            ("src/x.rs", "\n".into()),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "owned-and-source"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("other:\n  src/x.rs\n"), "{out}");
+
+    // A spec that names the path only in its body, unquoted, or another
+    // file: other, exit 1.
+    for (branch, text) in [
+        (
+            "body-only",
+            "---\nid: \"9-x\"\n---\n\nchanges \"deny.toml\"\n".to_string(),
+        ),
+        ("unquoted", spec("deny.toml")),
+        (
+            "unclosed",
+            "---\nid: \"9-x\"\npath: \"deny.toml\"\n".to_string(),
+        ),
+        ("elsewhere", spec("\"supply-chain/config.toml\"")),
+    ] {
+        git(root, &["checkout", "--quiet", "-b", branch, "main"]);
+        commit(
+            root,
+            &[
+                ("deny.toml", "[advisories]\nignore = []\n".into()),
+                ("specs/9-x/spec.md", text),
+            ],
+        );
+        let (code, out) = run_script(root, guard, &["main", branch]);
+        assert_eq!(code, 1, "{branch}: {out}");
+        assert!(
+            out.contains("other:\n  specs/9-x/spec.md\n"),
+            "{branch}: {out}"
+        );
+    }
 }
 
 #[test]
