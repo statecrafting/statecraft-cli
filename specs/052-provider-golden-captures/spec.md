@@ -2,7 +2,7 @@
 id: "052-provider-golden-captures"
 title: "Version-pinned provider captures, a quarantine and a divergence ledger gate a new provider version"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Turns the Claude Code adapter's recorded streams into a governed corpus of
@@ -215,6 +215,13 @@ Its review found one more field 2.1.318 adds, `credential_expires_at`, which
 describes the operator's credential, so the README's list fixes it to the
 capture date's midnight as it does `timestamp`. The provider's request,
 message and tool-use ids stay verbatim, as the goldens keep them.
+
+**2026-11-08: implementation complete.** Both verbs, the corpus, the
+quarantine, the ledger and the qualification precondition are on `main`,
+with the reviewed 2.1.318 capture set committed under `captures/`. All six
+commands of `make verify SPEC=052` pass at `f133913a` on macOS aarch64, and
+`provider_compare` runs in CI's `code` job on Linux with networking denied.
+The owner approved the move to `complete` on 2026-11-08.
 
 ## Verification
 
