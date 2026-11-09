@@ -31,7 +31,7 @@
       }
     ],
     "sectionDigests": {
-      "070-a-read-only-root-refuses-only-a-link-the-child-could-write": "e616e1662ac8cba457c1c2d01dbca75839bc46ee0785067078feaab71c2cd42a",
+      "070-a-read-only-root-refuses-only-a-link-the-child-could-write": "699305081ba3752ad26b8233ad6999274f0b34a3ce4a721640a1b002f691c191",
       "1-purpose": "d8759c48ce787349cc68786309618c68061dfe8cd91769f55b4b4ef9b643e1d1",
       "2-territory": "d4c386a2ff60319266ac16b55f9ef49c0848414e78c67b5092b0606b6aff985c",
       "3-1-what-the-alias-scan-refuses": "9b9b6b951d49e7624c87357e83b42fc33458e8412c423a8335605ab2a885b669",
@@ -40,7 +40,7 @@
       "3-behavior": "92d89c999e022a3e16e54ecdc90a95dede2139b523716b59cac3cf1be5d44ae5",
       "4-out-of-scope": "128c278c4d36c351b977fb6340cc84d3b98cfb7aa8b02080bf7a0359cdbab2f1",
       "5-resolved-decisions": "000953cd72926d9f373335a822de814a63afc2d8c7c13975af06a4b455f40d04",
-      "verification": "e9b83f59e911a92d0035427f5581140b8589eb64199331f64b3efc23a0f5064c"
+      "verification": "be8d97cdbf86b05de8c5fac758ed7e674f27939f9b67653f110a91809c50196d"
     },
     "sectionHeadings": [
       "070: A read-only root refuses only a link the child could write",
@@ -55,10 +55,10 @@
       "Verification"
     ],
     "specPath": "specs/070-writable-alias-scan/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 004 section 3.18 rule 2's alias scan. An inaccessible root still refuses any multiply linked file. A read-only root (the target's working tree, its Git directory, another attempt's workspace) refuses a multiply linked file only when another of its names lies where the child may write. Cargo's build output in a checkout and Git objects shared with a local clone no longer refuse every launch.\n",
     "title": "A read-only root refuses only a link the child could write"
   },
-  "shardHash": "3b2d8a2c47624dc8975b0aaa2ac13349be5f3582c94b5c690a87daca1155587e",
+  "shardHash": "77ec4f3ecb2239585eadb8a9a706e8a16984a44b4c23940a7b5339bae0006aa8",
   "specVersion": "1.11.0"
 }
