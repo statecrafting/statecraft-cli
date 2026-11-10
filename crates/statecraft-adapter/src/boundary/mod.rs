@@ -650,7 +650,14 @@ fn writable_aliases(policy: &Policy) -> Result<BTreeSet<FileId>, Refused> {
             continue;
         };
         let name = name.as_encoded_bytes();
-        for item in fs::read_dir(parent).map_err(|e| Refused::at("alias-scan", e))? {
+        // The parent was canonicalized above, so it existed a moment ago; if
+        // it is gone now, no file under it can carry a name the prefix grants.
+        let entries = match fs::read_dir(parent) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(Refused::at("alias-scan", error)),
+        };
+        for item in entries {
             let item = item.map_err(|e| Refused::at("alias-scan", e))?;
             if item.file_name().as_encoded_bytes().starts_with(name) {
                 collect_aliases(&item.path(), &mut ids)?;
@@ -661,7 +668,14 @@ fn writable_aliases(policy: &Policy) -> Result<BTreeSet<FileId>, Refused> {
 }
 
 fn collect_aliases(path: &Path, ids: &mut BTreeSet<FileId>) -> Result<(), Refused> {
-    let meta = fs::symlink_metadata(path).map_err(|e| Refused::at("alias-scan", e))?;
+    // A missing writable grant was already refused at "write-root"; NotFound
+    // here is an entry removed during the walk, which has no inode to alias.
+    // Every other error still refuses.
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(Refused::at("alias-scan", error)),
+    };
     #[cfg(unix)]
     if meta.is_file() {
         use std::os::unix::fs::MetadataExt;
