@@ -328,3 +328,73 @@ fn a_home_path_over_100_bytes_is_admitted_with_the_probe_socket_under_tmp() {
     assert_eq!(again.policy.inaccessible, record.policy.inaccessible);
     assert_eq!(again.policy.readonly, record.policy.readonly);
 }
+
+// Spec 070 section 3.1, amending spec 004 section 3.18 rule 2: a read-only
+// root refuses a multiply linked file only when the child could write one of
+// its other names. Cargo's links inside the operator's checkout, and Git's
+// objects shared with a local clone, are readable anyway and do not refuse;
+// a link from the checkout into a writable root still does.
+#[test]
+fn a_read_only_root_refuses_only_a_link_the_child_could_write() {
+    let fixture = tempfile::tempdir().unwrap();
+    let checkout = fixture.path().join("checkout");
+    let deps = checkout.join("target/debug/deps");
+    let clone = fixture.path().join("clone");
+    let workspace = fixture.path().join("workspace");
+    let home = fixture.path().join("home");
+    for d in [&deps, &clone, &workspace, &home] {
+        fs::create_dir_all(d).unwrap();
+    }
+    fs::write(deps.join("lib.rcgu.o"), b"object").unwrap();
+    fs::hard_link(deps.join("lib.rcgu.o"), deps.join("lib-copy.rcgu.o")).unwrap();
+    fs::write(checkout.join("pack"), b"object store").unwrap();
+    fs::hard_link(checkout.join("pack"), clone.join("pack")).unwrap();
+    fs::write(checkout.join("source.rs"), b"fn main() {}").unwrap();
+    // The workspace holds its own multiply linked build output, so the
+    // read-only walk runs and must still pass over the checkout's links.
+    fs::write(workspace.join("own.o"), b"own").unwrap();
+    fs::hard_link(workspace.join("own.o"), workspace.join("own-copy.o")).unwrap();
+    let policy = || Policy {
+        inaccessible: vec![home.clone()],
+        readonly: vec![checkout.clone()],
+        readable: vec![],
+        writable: vec![Grant {
+            path: workspace.clone(),
+            directory: true,
+        }],
+        adjacent_prefixes: vec![],
+    };
+    Prepared::prepare(policy()).expect("links the child cannot write do not refuse");
+
+    fs::hard_link(checkout.join("source.rs"), workspace.join("alias.rs")).unwrap();
+    let refusal = Prepared::prepare(policy()).err().unwrap();
+    assert_eq!(refusal.step, "hardlink");
+    assert!(refusal.detail.contains("source.rs"), "{}", refusal.detail);
+}
+
+// Spec 070 section 3.2: a writable file grant, not only a directory, is a
+// name the child could write through.
+#[test]
+fn a_read_only_file_linked_to_a_writable_file_grant_refuses() {
+    let fixture = tempfile::tempdir().unwrap();
+    let checkout = fixture.path().join("checkout");
+    let exchange = fixture.path().join("exchange");
+    for d in [&checkout, &exchange] {
+        fs::create_dir_all(d).unwrap();
+    }
+    fs::write(checkout.join("config"), b"bytes").unwrap();
+    fs::hard_link(checkout.join("config"), exchange.join("gate.log")).unwrap();
+    let refusal = Prepared::prepare(Policy {
+        inaccessible: vec![],
+        readonly: vec![checkout],
+        readable: vec![],
+        writable: vec![Grant {
+            path: exchange.join("gate.log"),
+            directory: false,
+        }],
+        adjacent_prefixes: vec![],
+    })
+    .err()
+    .unwrap();
+    assert_eq!(refusal.step, "hardlink");
+}

@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io;
 use std::net::SocketAddr;
@@ -311,8 +311,18 @@ impl Prepared {
                 .map_err(|e| Refused::at("configuration-prefix", e))?
                 .join(name);
         }
-        for root in policy.inaccessible.iter().chain(&policy.readonly) {
-            check_links(root, &policy)?;
+        for root in &policy.inaccessible {
+            check_links(root, &policy, None)?;
+        }
+        // Spec 070 section 3.1: a read-only root is checked for writable
+        // aliases, not for every link. The identities of the multiply linked
+        // files the child could write are gathered first; when there are
+        // none, no read-only file can share one, and the walk is skipped.
+        let writable = writable_aliases(&policy)?;
+        if !writable.is_empty() {
+            for root in &policy.readonly {
+                check_links(root, &policy, Some(&writable))?;
+            }
         }
         let native = native::Prepared::new(&policy, &network)?;
         let mut open_items: Vec<String> = OPEN_ITEMS.iter().map(|s| (*s).into()).collect();
@@ -582,7 +592,17 @@ fn check_endpoint(endpoint: SocketAddr) -> Result<(), Refused> {
     Ok(())
 }
 
-fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
+/// The device and inode of a multiply linked file.
+type FileId = (u64, u64);
+
+/// Walk a protected root. Under an inaccessible root (`writable` is `None`)
+/// every multiply linked file refuses; under a read-only root only one that
+/// shares its identity with a file the child may write.
+fn check_links(
+    path: &Path,
+    policy: &Policy,
+    writable: Option<&BTreeSet<FileId>>,
+) -> Result<(), Refused> {
     if policy
         .writable
         .iter()
@@ -594,7 +614,11 @@ fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
     #[cfg(unix)]
     if meta.is_file() {
         use std::os::unix::fs::MetadataExt;
-        if meta.nlink() != 1 {
+        let aliased = match writable {
+            None => meta.nlink() != 1,
+            Some(ids) => meta.nlink() != 1 && ids.contains(&(meta.dev(), meta.ino())),
+        };
+        if aliased {
             return Err(Refused::at(
                 "hardlink",
                 format!("multiply linked protected file {}", path.display()),
@@ -606,7 +630,62 @@ fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
             check_links(
                 &item.map_err(|e| Refused::at("alias-scan", e))?.path(),
                 policy,
+                writable,
             )?;
+        }
+    }
+    Ok(())
+}
+
+/// The identities of every multiply linked file the child may write: under a
+/// writable directory, a writable file, and (macOS) an existing file whose
+/// name a literal adjacent prefix grants.
+fn writable_aliases(policy: &Policy) -> Result<BTreeSet<FileId>, Refused> {
+    let mut ids = BTreeSet::new();
+    for grant in &policy.writable {
+        collect_aliases(&grant.path, &mut ids)?;
+    }
+    for prefix in &policy.adjacent_prefixes {
+        let (Some(parent), Some(name)) = (prefix.parent(), prefix.file_name()) else {
+            continue;
+        };
+        let name = name.as_encoded_bytes();
+        // The parent was canonicalized above, so it existed a moment ago; if
+        // it is gone now, no file under it can carry a name the prefix grants.
+        let entries = match fs::read_dir(parent) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(Refused::at("alias-scan", error)),
+        };
+        for item in entries {
+            let item = item.map_err(|e| Refused::at("alias-scan", e))?;
+            if item.file_name().as_encoded_bytes().starts_with(name) {
+                collect_aliases(&item.path(), &mut ids)?;
+            }
+        }
+    }
+    Ok(ids)
+}
+
+fn collect_aliases(path: &Path, ids: &mut BTreeSet<FileId>) -> Result<(), Refused> {
+    // A missing writable grant was already refused at "write-root"; NotFound
+    // here is an entry removed during the walk, which has no inode to alias.
+    // Every other error still refuses.
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(Refused::at("alias-scan", error)),
+    };
+    #[cfg(unix)]
+    if meta.is_file() {
+        use std::os::unix::fs::MetadataExt;
+        if meta.nlink() != 1 {
+            ids.insert((meta.dev(), meta.ino()));
+        }
+    }
+    if meta.is_dir() {
+        for item in fs::read_dir(path).map_err(|e| Refused::at("alias-scan", e))? {
+            collect_aliases(&item.map_err(|e| Refused::at("alias-scan", e))?.path(), ids)?;
         }
     }
     Ok(())
