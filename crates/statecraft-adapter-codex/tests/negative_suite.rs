@@ -4,10 +4,10 @@
 //!
 //! Every stream is replayed through a real child under the seam's supervisor:
 //! `/bin/sh` reads the prompt from standard input and writes committed bytes
-//! from `testdata/stream/`. **Those bytes are synthetic** (see that
-//! directory's `README.md`), so a pass here is not a qualification record:
-//! one is earned only when the same suite passes on fixtures recorded from a
-//! named Codex version.
+//! from `testdata/stream/`. `corpus.json` there names each capture's Codex
+//! version, platform, invocation and date, and the one constructed hostile
+//! input, and a test below holds the suite to that list. The pass on codex-cli 0.166.0 is recorded in
+//! `testdata/qualification.json` (spec 055 section 5, 2026-11-15).
 
 use statecraft_adapter::capabilities::{Field, Needs, fit};
 use statecraft_adapter::capability::{Capability, Requested, negotiate};
@@ -307,6 +307,74 @@ fn section_3_5_only_this_adapters_own_record_for_the_observed_version_qualifies(
     sibling.adapter.adapter = "another-adapter".into();
     assert_eq!(
         qualification_for_pair(&manifest, MEASURED_PROVIDER_VERSION, &[sibling]),
+        Qualification::Unqualified
+    );
+}
+
+fn corpus() -> serde_json::Value {
+    serde_json::from_str(&fixture("corpus.json")).unwrap()
+}
+
+#[test]
+fn every_stream_the_suite_reads_is_a_named_capture_or_a_named_constructed_input() {
+    let corpus = corpus();
+    let captured: Vec<&str> = corpus["captures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            assert_eq!(c["providerVersion"], MEASURED_PROVIDER_VERSION, "{c}");
+            for key in ["scenario", "platform", "invocation", "captured"] {
+                assert!(c[key].as_str().is_some_and(|v| !v.is_empty()), "{key}: {c}");
+            }
+            c["file"].as_str().unwrap()
+        })
+        .collect();
+    let constructed: Vec<&str> = corpus["constructed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            assert!(c["reason"].as_str().is_some_and(|r| !r.is_empty()), "{c}");
+            c["file"].as_str().unwrap()
+        })
+        .collect();
+    assert_eq!(captured, ["completed.jsonl", "error.jsonl"]);
+    assert_eq!(constructed, ["turn-failed.jsonl"]);
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/stream");
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let name = entry.unwrap().file_name().into_string().unwrap();
+        if name.ends_with(".jsonl") {
+            assert!(
+                captured.contains(&name.as_str()) || constructed.contains(&name.as_str()),
+                "{name} is in neither list"
+            );
+        }
+    }
+}
+
+/// The record names this build's own version (`CARGO_PKG_VERSION`, today the
+/// workspace's `0.0.0`) on purpose: spec 004 section 3.4 qualifies one binary
+/// version and says a record for another does not transfer. A version bump
+/// therefore fails this test until the suite is passed again and a new record
+/// written, which is the requalification the spec asks for, not a regression.
+#[test]
+fn the_committed_record_qualifies_this_build_on_the_measured_codex_version_only() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/qualification.json");
+    let records: Vec<codex::qualification::PairedRecord> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let [only] = records.as_slice() else {
+        panic!("one record expected, found {}", records.len());
+    };
+    let expected = record(MEASURED_PROVIDER_VERSION, SUITE_VERSION, &only.adapter.date);
+    assert_eq!(only, &expected);
+    let manifest = codex::manifest();
+    assert_eq!(
+        qualification_for_pair(&manifest, MEASURED_PROVIDER_VERSION, &records),
+        Qualification::Qualified
+    );
+    assert_eq!(
+        qualification_for_pair(&manifest, "0.167.0", &records),
         Qualification::Unqualified
     );
 }

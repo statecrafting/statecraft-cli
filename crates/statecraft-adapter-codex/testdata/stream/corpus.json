@@ -1,0 +1,28 @@
+{
+  "captures": [
+    {
+      "scenario": "completed",
+      "providerVersion": "0.166.0",
+      "platform": "darwin",
+      "invocation": "codex exec --json --color never --sandbox workspace-write --skip-git-repo-check -C <work tree> -c approval_policy=\"never\" -, the prompt on standard input, in a scratch git work tree with a per-run CODEX_HOME",
+      "captured": "2026-11-02",
+      "file": "completed.jsonl",
+      "redactions": ["fixed value: thread_id"]
+    },
+    {
+      "scenario": "error",
+      "providerVersion": "0.166.0",
+      "platform": "darwin",
+      "invocation": "codex exec --json --color never --sandbox workspace-write --skip-git-repo-check -C <work tree> -c approval_policy=\"never\" -c model=\"statecraft-no-such-model\" -, the prompt on standard input, in a scratch git work tree with a per-run CODEX_HOME",
+      "captured": "2026-11-02",
+      "file": "error.jsonl",
+      "redactions": ["fixed value: thread_id"]
+    }
+  ],
+  "constructed": [
+    {
+      "file": "turn-failed.jsonl",
+      "reason": "a hostile input, not a capture: one turn.failed with no error event, a shape no recording shows, replayed so the suite proves it is read as interrupted and never as a judged result"
+    }
+  ]
+}

@@ -272,6 +272,15 @@ labelled `unqualified` until one exists. With the declaration measured and
 every Verification command passing, `implementation` is `complete`. The
 owner approved this on 2026-11-08.
 
+**2026-11-15: the settings_file_transport reading confirmed, and the
+qualification record.** The owner confirmed the 2026-11-08 reading, so
+`settings_file_transport` stays `true`. Section 3.5's record now exists for
+this build on codex-cli 0.166.0 (`testdata/qualification.json`), earned on
+the captures `testdata/stream/corpus.json` names. It does not cover the
+managed hook answer, which is section 3.4's and stays derived until the
+operator's installation, and no verb reads it until a later spec adds Codex
+to the CLI's adapter set, which spec 008 limits to Claude Code.
+
 ## Appendix A: other harnesses (reference only)
 
 Recorded from preloop at revision

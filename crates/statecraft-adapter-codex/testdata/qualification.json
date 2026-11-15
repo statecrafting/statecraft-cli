@@ -1,0 +1,11 @@
+[
+  {
+    "adapter": {
+      "adapter": "codex",
+      "binary_version": "0.0.0",
+      "suite_version": "025.3.5",
+      "date": "2026-11-15T00:00:00Z"
+    },
+    "providerVersion": "0.166.0"
+  }
+]

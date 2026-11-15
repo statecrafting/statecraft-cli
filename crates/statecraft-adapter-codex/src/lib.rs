@@ -11,10 +11,13 @@
 //! 3.2) were taken from `codex-cli 0.163.0` on 2026-10-21, and recorded again
 //! from `codex-cli 0.166.0` on 2026-11-02: `testdata/stream/completed.jsonl`,
 //! `error.jsonl` and `testdata/hooks/untrusted.json` are those recordings, and
-//! each directory's `README.md` names what is still synthetic or derived. The
-//! adapter is still `unqualified` (section 3.5): a managed hook answer needs
-//! the operator's one-time installation. Its spec 047 declaration sets every
-//! field nobody has measured to `false` (section 3.6).
+//! each directory's `README.md` names what is still synthetic or derived.
+//! Section 3.5's record for this build on codex-cli 0.166.0 is
+//! `testdata/qualification.json`, earned by `tests/negative_suite.rs` on the
+//! streams `testdata/stream/corpus.json` names. The managed hook answer is
+//! still derived until the operator's one-time installation (section 3.4). Its
+//! spec 047 declaration sets every field nobody has measured to `false`
+//! (section 3.6).
 //!
 //! # The shape of it
 //!
