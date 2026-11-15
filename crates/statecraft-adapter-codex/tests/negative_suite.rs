@@ -353,6 +353,11 @@ fn every_stream_the_suite_reads_is_a_named_capture_or_a_named_constructed_input(
     }
 }
 
+/// The record names this build's own version (`CARGO_PKG_VERSION`, today the
+/// workspace's `0.0.0`) on purpose: spec 004 section 3.4 qualifies one binary
+/// version and says a record for another does not transfer. A version bump
+/// therefore fails this test until the suite is passed again and a new record
+/// written, which is the requalification the spec asks for, not a regression.
 #[test]
 fn the_committed_record_qualifies_this_build_on_the_measured_codex_version_only() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/qualification.json");
