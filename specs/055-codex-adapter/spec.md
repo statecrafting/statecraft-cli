@@ -272,6 +272,31 @@ labelled `unqualified` until one exists. With the declaration measured and
 every Verification command passing, `implementation` is `complete`. The
 owner approved this on 2026-11-08.
 
+**2026-11-15: the settings_file_transport reading confirmed, and the
+qualification record.** The owner confirmed the 2026-11-08 reading: Codex's
+`config.toml` at the per-run `CODEX_HOME` the supervisor chooses is a
+settings document read from a file path the supervisor supplies, so
+`settings_file_transport` stays `true`.
+
+The owner asked for section 3.5's record on codex-cli 0.166.0, the version
+installed when it was made. `testdata/stream/corpus.json` names the two
+streams the suite replays as captures (`completed.jsonl`, `error.jsonl`),
+each with its Codex version, platform, invocation, date and redactions in
+spec 052's capture shape, and names `turn-failed.jsonl` apart as a
+constructed hostile input, a shape no recording shows. The suite refuses a
+stream named in neither list. Spec 004's suite, version `025.3.5`, passed on
+those streams, and `testdata/qualification.json` holds the record for this
+build and 0.166.0, dated 2026-11-15. A test holds the record to the build,
+the suite version and the measured Codex version, and shows it does not
+qualify another Codex version.
+
+Two limits stand. The record qualifies the pair and nothing else: the
+managed hook answer (`hooks/managed.json`) is section 3.4's gate check, not
+the suite, and stays derived until the operator's installation. And no verb
+reads this record yet: the CLI's configured adapter set is Claude Code alone
+(spec 008), so wiring Codex into it is a later spec's, and the record waits
+for that.
+
 ## Appendix A: other harnesses (reference only)
 
 Recorded from preloop at revision
