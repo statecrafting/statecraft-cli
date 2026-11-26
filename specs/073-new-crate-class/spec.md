@@ -219,18 +219,18 @@ workspace root and one existing crate that depends on one registry package.
 an admin merge, and dependency review stays isolated: the exemption covers a
 crate that adds no package, and every registry or git change remains policy.
 
+**2026-11-26: a dependency line is matched whole.** Section 3.1 lists the
+admitted shapes and is silent on a trailing comment, so a dependency line
+with one, a version requirement holding a comma, or a key written with an
+underscore (`default_features`) is not admitted and keeps the manifest
+policy. Matching the whole line keeps the class textual and closed.
+
 **2026-11-24: the lockfile is the backstop, the manifest the first test.** A
 manifest can only state requirements; the lockfile states what cargo resolved.
 Requiring both means a manifest that slips past 3.1 through an inherited but
 unused declaration, a feature that enables a dependency's optional package, or
 a path to a crate outside the workspace still fails on the lock, because each
 of those adds a block with a source.
-
-**2026-11-26: a dependency line is matched whole.** Section 3.1 lists the
-admitted shapes and is silent on a trailing comment, so a dependency line
-with one, a version requirement holding a comma, or a key written with an
-underscore (`default_features`) is not admitted and keeps the manifest
-policy. Matching the whole line keeps the class textual and closed.
 
 ## Verification
 
