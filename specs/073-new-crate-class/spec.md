@@ -1,7 +1,7 @@
 ---
 id: "073-new-crate-class"
 title: "Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-24"
 summary: >
@@ -228,7 +228,7 @@ of those adds a block with a source.
 
 ## Verification
 
-Each line is one command.
+Ratified by the owner on 2026-11-26. Each line is one command.
 
 ```verify:cli
 cargo test -p statecraft-home --test setup_workflows the_policy_guard
