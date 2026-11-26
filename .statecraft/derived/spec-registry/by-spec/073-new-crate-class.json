@@ -56,7 +56,7 @@
       }
     ],
     "sectionDigests": {
-      "073-setup-profile-revision-29-the-policy-isolation-guard-ignores-a-new-workspace-crate-that-adds-no-dependency": "66ff94251cb22334049835432aa89fb511b1f59ff90eaf319e5854b0777df942",
+      "073-setup-profile-revision-29-the-policy-isolation-guard-ignores-a-new-workspace-crate-that-adds-no-dependency": "33632d6390682690f2d407a86665bf750beda6407dabc0437f01ed32fa8e3412",
       "1-purpose": "c76f23bae7473fd2a6e265905797f24879f5916ef70cbf59ca37e62a50ea7b56",
       "2-territory": "42ca9f7f62823531e381e3777b34eceec14ede5e0c0622f3237532269fad2584",
       "3-1-the-new-crate-manifest": "db19c4047e4aa28965bbd3e2362f8daa71757f64145d75e224fc2d159703aa28",
@@ -66,7 +66,7 @@
       "3-5-observable-cases": "be6907dae99976958e2a1147113155c715bb755f29c21c6d93e56e7fde120bd4",
       "3-behavior": "c0205c7c2b4df1c404a2b8cb9ebfdd9e5f1b3bc3a232caa14230a7c9c27e1cdd",
       "4-out-of-scope": "3301ada52cd5ec896e6e67da6d7f8f951729c699b7afcb52df942b114899d3aa",
-      "5-resolved-decisions": "b26300e3a73ce90e0b0412d15c1882f26e981fb52a34d5b410924623a616607f",
+      "5-resolved-decisions": "b533cc1e54aa9c08a6a80015113fa2a29ddd52bb2226cc1914fbd675144f9cee",
       "verification": "9dff87aa7a5c23ba3cbc1054b8247174e48c15fb413c209560810ce552433489"
     },
     "sectionHeadings": [
@@ -88,6 +88,6 @@
     "summary": "Amends spec 044 section 3.3, specs 071 and 072, and spec 002's setup profile. A workspace whose members are a glob picks up a new crate's Cargo.toml the moment it lands, so the manifest cannot land before its sources (the build breaks) and cannot land with them (the guard reads policy plus other). Every new crate has needed an admin merge. Revision 29 adds a class, new-crate: a Cargo.toml in a directory that is new at the head, whose every dependency inherits from the workspace or is a path to a workspace crate, and a Cargo.lock whose only change is that crate's sourceless entry and the dependency lists that reference it. Like generated paths it is ignored. Any added, removed or changed registry or git package keeps the file policy, so a dependency still lands alone.\n",
     "title": "Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency"
   },
-  "shardHash": "5166d003efb12cbefd2f1ce2f0272aca2c51edad5c2b18af1bc59efac15ace23",
+  "shardHash": "d3b53a11fc1f4c403a31b724a3a500ff6e4f4f93c534925d9f1bb102bc9c9667",
   "specVersion": "1.11.0"
 }
