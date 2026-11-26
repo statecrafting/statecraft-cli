@@ -269,12 +269,27 @@ fn swap(body: &mut String, new: &str, old: &str) {
     *body = body.replacen(new, old, 1);
 }
 
+/// Revision 28 of the registered profile: revision 29 (spec 073) changed only
+/// the policy-isolation guard, so revision 28 is the registered profile with
+/// the guard captured byte for byte from main at ae5c60ae.
+fn revision_twenty_eight() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 29, "the registered profile is revision 29");
+    p.revision = 28;
+    *body(&mut p, "scripts/statecraft/guard-policy-files.sh") =
+        include_str!("support/profile-r28/guard-policy-files.sh").into();
+    for t in &p.templates {
+        assert!(!t.body.contains("spec 073"), "{}", t.path);
+    }
+    p
+}
+
 /// Revision 27 of the registered profile: revision 28 (spec 072) changed the
 /// policy-isolation guard, captured byte for byte from main at bdbf9211, and
 /// three comments in the gate script and the workflow, put back here.
 fn revision_twenty_seven() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 28, "the registered profile is revision 28");
+    let mut p = revision_twenty_eight();
+    assert_eq!(p.revision, 28);
     p.revision = 27;
     *body(&mut p, "scripts/statecraft/guard-policy-files.sh") =
         include_str!("support/profile-r27/guard-policy-files.sh").into();
@@ -1887,8 +1902,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 through 28 change no installer byte.
-    assert_eq!(next.revision, 28);
+    // Revisions 16 through 29 change no installer byte.
+    assert_eq!(next.revision, 29);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -2660,7 +2675,7 @@ fn a_revision_twenty_seven_project_upgrades_to_revision_twenty_eight() {
     let dir = project();
     let root = dir.path();
     let old = revision_twenty_seven();
-    let next = Profile::registered();
+    let next = revision_twenty_eight();
     assert_eq!(next.revision, setup::OWNING_SPEC_SINCE);
     assert_ne!(old.identity(), next.identity());
     let mut manifest = Manifest::new(Pins {
@@ -2709,6 +2724,56 @@ fn a_revision_twenty_seven_project_upgrades_to_revision_twenty_eight() {
     let obligations = setup::remote_obligations().join("\n");
     assert!(obligations.contains("branches up to date is not required"));
     assert!(obligations.contains("revision 28: the policy-isolation guard"));
+    let again = plan_and_apply(root, &next, &mut manifest);
+    assert!(again.files.iter().all(|f| !f.action.writes()));
+}
+
+#[test]
+fn a_revision_twenty_eight_project_upgrades_to_revision_twenty_nine() {
+    let dir = project();
+    let root = dir.path();
+    let old = revision_twenty_eight();
+    let next = Profile::registered();
+    assert_eq!(next.revision, setup::NEW_CRATE_SINCE);
+    assert_ne!(old.identity(), next.identity());
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let changed = "scripts/statecraft/guard-policy-files.sh";
+    let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+    let before: BTreeMap<String, String> = old
+        .templates
+        .iter()
+        .filter(|t| t.path != changed && root.join(&t.path).is_file())
+        .map(|t| (t.path.clone(), read(&t.path)))
+        .collect();
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert!(upgraded.whole(), "{:?}", upgraded.withheld);
+    let written: Vec<&str> = upgraded
+        .files
+        .iter()
+        .filter(|f| f.action.writes())
+        .map(|f| f.path.as_str())
+        .collect();
+    assert!(written.contains(&changed), "{written:?}");
+    for (path, was) in &before {
+        let now = read(path);
+        assert_eq!(
+            now.replace("revision 29", "revision 28")
+                .replace(&next.identity(), &old.identity()),
+            *was,
+            "{path}"
+        );
+    }
+    assert!(read(changed).contains("new crate (ignored)"));
+    let policy: serde_json::Value = serde_json::from_str(&read(setup::POLICY_PATH)).unwrap();
+    assert_eq!(policy["revision"], 29);
+    let obligations = setup::remote_obligations().join("\n");
+    assert!(obligations.contains("revision 29: the policy-isolation guard"));
     let again = plan_and_apply(root, &next, &mut manifest);
     assert!(again.files.iter().all(|f| !f.action.writes()));
 }

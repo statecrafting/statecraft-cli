@@ -5964,7 +5964,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 28, "the registered profile is revision 28");
+    assert_eq!(p.revision, 29, "the registered profile is revision 29");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -6929,7 +6929,9 @@ fn the_policy_guard_ignores_a_workspace_version_bump() {
     assert_eq!(code, 1, "{out}");
     assert!(out.contains("policy:\n  Cargo.lock\n"), "{out}");
 
-    // A new crate's Cargo.toml is not a bump: policy, exit 1.
+    // A new crate's Cargo.toml is not a bump. Revision 29 (spec 073) ignores
+    // one that adds no dependency as new-crate, and one that names a registry
+    // package stays policy: exit 1.
     git(root, &["checkout", "--quiet", "-b", "added", "main"]);
     commit_files(
         root,
@@ -6939,6 +6941,20 @@ fn the_policy_guard_ignores_a_workspace_version_bump() {
         ],
     );
     let (code, out) = run_script(root, guard, &["main", "added"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("1 new crate (ignored)"), "{out}");
+    git(root, &["checkout", "--quiet", "-b", "added-dep", "main"]);
+    commit_files(
+        root,
+        &[
+            (
+                "crates/b/Cargo.toml",
+                "[package]\nname = \"b\"\n\n[dependencies]\nserde = \"1\"\n",
+            ),
+            ("src/y.rs", "\n"),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "added-dep"]);
     assert_eq!(code, 1, "{out}");
     assert!(out.contains("policy:\n  crates/b/Cargo.toml\n"), "{out}");
 }
@@ -7061,6 +7077,257 @@ fn the_policy_guard_ignores_a_self_pin_and_the_owning_spec() {
             "{branch}: {out}"
         );
     }
+}
+
+/// A glob-member workspace at `version` with one crate, `a`, that depends on
+/// one registry package; `anyhow` is declared for the workspace but unused.
+fn glob_workspace(version: &str) -> Vec<(&'static str, String)> {
+    vec![
+        (
+            "Cargo.toml",
+            format!(
+                "[workspace]\nmembers = [\"crates/*\"]\n\n[workspace.package]\nversion = \"{version}\"\n\n[workspace.dependencies]\na = {{ path = \"crates/a\", version = \"{version}\" }}\nserde = {{ version = \"1.0.200\" }}\nanyhow = {{ version = \"1\" }}\n"
+            ),
+        ),
+        (
+            "crates/a/Cargo.toml",
+            format!(
+                "[package]\nname = \"a\"\nversion = \"{version}\"\n\n[dependencies]\nserde.workspace = true\n"
+            ),
+        ),
+        ("crates/a/src/lib.rs", "\n".into()),
+        ("Cargo.lock", glob_lock(version, "")),
+    ]
+}
+
+/// The glob workspace's lockfile at `version`, with `extra` blocks appended.
+fn glob_lock(version: &str, extra: &str) -> String {
+    format!(
+        "version = 4\n\n[[package]]\nname = \"a\"\nversion = \"{version}\"\ndependencies = [\n \"serde\",\n]\n\n[[package]]\nname = \"serde\"\nversion = \"1.0.200\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n{extra}"
+    )
+}
+
+/// The lockfile block of a new local crate `b` that depends on `deps`.
+fn local_block(version: &str, deps: &[&str]) -> String {
+    let list: String = deps.iter().map(|d| format!(" \"{d}\",\n")).collect();
+    format!("\n[[package]]\nname = \"b\"\nversion = \"{version}\"\ndependencies = [\n{list}]\n")
+}
+
+#[test]
+fn the_policy_guard_ignores_a_new_crate_that_adds_no_dependency() {
+    // Spec 073: revision 29, section 3.5.
+    let guard = "guard-policy-files.sh";
+    let repo = guard_repo();
+    let root = repo.path();
+    let commit = |root: &Path, all: &[(&str, String)]| {
+        let refs: Vec<(&str, &str)> = all.iter().map(|(p, t)| (*p, t.as_str())).collect();
+        commit_files(root, &refs);
+    };
+    commit(root, &glob_workspace("0.5.0"));
+    let manifest = |deps: &str| {
+        format!(
+            "[package]\nname = \"b\"\nversion.workspace = true\nedition = \"2021\"\n\n[dependencies]\n{deps}\n[lints]\nworkspace = true\n"
+        )
+    };
+    let run = |branch: &str, files: Vec<(&str, String)>| {
+        git(root, &["checkout", "--quiet", "-b", branch, "main"]);
+        commit(root, &files);
+        run_script(root, guard, &["main", branch])
+    };
+    let lock = |extra: String| ("Cargo.lock", glob_lock("0.5.0", &extra));
+
+    // A new crate with a workspace and a path dependency, its source, and
+    // its sourceless lockfile entry: two new-crate paths, exit 0.
+    let (code, out) = run(
+        "new",
+        vec![
+            ("crates/b/Cargo.toml", manifest("a = { path = \"../a\" }\n")),
+            ("crates/b/src/lib.rs", "\n".into()),
+            lock(local_block("0.5.0", &["a"])),
+        ],
+    );
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("0 policy, 0 generated (ignored), 1 other, 0 version-only (ignored), 0 owning spec (ignored), 2 new crate (ignored)"),
+        "{out}"
+    );
+
+    // A dependency the workspace already locks, through workspace = true and
+    // with features: exit 0.
+    let (code, out) = run(
+        "locked",
+        vec![
+            (
+                "crates/b/Cargo.toml",
+                manifest("serde = { workspace = true, features = [\"derive\", \"std\"] }\n"),
+            ),
+            ("crates/b/src/lib.rs", "\n".into()),
+            lock(local_block("0.5.0", &["serde"])),
+        ],
+    );
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("2 new crate (ignored)"), "{out}");
+
+    // A registry version string: the manifest and the lockfile are policy.
+    let (code, out) = run(
+        "registry",
+        vec![
+            ("crates/b/Cargo.toml", manifest("serde = \"1\"\n")),
+            ("crates/b/src/lib.rs", "\n".into()),
+            lock(local_block("0.5.0", &["serde"])),
+        ],
+    );
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("policy:\n  Cargo.lock\n  crates/b/Cargo.toml\n"),
+        "{out}"
+    );
+
+    // An inherited declaration no member used: cargo locks a new registry
+    // package, so the lockfile is policy and the manifest new-crate.
+    let anyhow = "\n[[package]]\nname = \"anyhow\"\nversion = \"1.0.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n";
+    let (code, out) = run(
+        "unused",
+        vec![
+            ("crates/b/Cargo.toml", manifest("anyhow.workspace = true\n")),
+            ("crates/b/src/lib.rs", "\n".into()),
+            lock(format!("{anyhow}{}", local_block("0.5.0", &["anyhow"]))),
+        ],
+    );
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  Cargo.lock\nother:"), "{out}");
+    assert!(out.contains("1 new crate (ignored)"), "{out}");
+
+    // A registry block beside a source file, with no new manifest: exit 1.
+    let (code, out) = run(
+        "lock-only",
+        vec![lock(anyhow.to_string()), ("src/x.rs", "\n".into())],
+    );
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  Cargo.lock\n"), "{out}");
+
+    // Shapes section 3.1 does not admit: the manifest stays policy.
+    for (branch, text) in [
+        (
+            "git",
+            manifest("x = { git = \"https://example.invalid/x\" }\n"),
+        ),
+        (
+            "patch",
+            format!(
+                "{}\n[patch.crates-io]\nserde = {{ path = \"../s\" }}\n",
+                manifest("")
+            ),
+        ),
+        (
+            "subtable",
+            format!("{}\n[dependencies.serde]\nworkspace = true\n", manifest("")),
+        ),
+        (
+            "links",
+            manifest("").replace("edition", "links = \"z\"\nedition"),
+        ),
+        ("outside", manifest("q = { path = \"../../../q\" }\n")),
+        (
+            "multiline",
+            manifest("serde = { workspace = true,\n  features = [] }\n"),
+        ),
+        (
+            "workspace-table",
+            format!("{}\n[workspace]\n", manifest("")),
+        ),
+        (
+            "top-level-key",
+            format!("dependencies.serde = \"1\"\n{}", manifest("")),
+        ),
+    ] {
+        let (code, out) = run(
+            branch,
+            vec![
+                ("crates/b/Cargo.toml", text),
+                ("crates/b/src/lib.rs", "\n".into()),
+            ],
+        );
+        assert_eq!(code, 1, "{branch}: {out}");
+        assert!(
+            out.contains("policy:\n  crates/b/Cargo.toml\n"),
+            "{branch}: {out}"
+        );
+    }
+
+    // A new manifest in a directory the merge base already holds a file in.
+    git(root, &["checkout", "--quiet", "-b", "reused-base", "main"]);
+    commit(root, &[("crates/c/README.md", "c\n".into())]);
+    let (code, out) = {
+        git(
+            root,
+            &["checkout", "--quiet", "-b", "reused", "reused-base"],
+        );
+        commit(
+            root,
+            &[
+                ("crates/c/Cargo.toml", "[package]\nname = \"c\"\n".into()),
+                ("crates/c/src/lib.rs", "\n".into()),
+            ],
+        );
+        run_script(root, guard, &["reused-base", "reused"])
+    };
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  crates/c/Cargo.toml\n"), "{out}");
+
+    // A new manifest at a path git quotes stays policy.
+    let (code, out) = run(
+        "quoted",
+        vec![
+            (
+                "crates/\u{e9}/Cargo.toml",
+                "[package]\nname = \"e\"\n".into(),
+            ),
+            ("src/x.rs", "\n".into()),
+        ],
+    );
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("policy:\n  \"crates/\\303\\251/Cargo.toml\"\n"),
+        "{out}"
+    );
+
+    // A new crate inside a release bump: version-only beside new-crate, exit 0.
+    let mut bump = glob_workspace("0.6.0");
+    bump.retain(|(p, _)| *p != "Cargo.lock" && *p != "crates/a/src/lib.rs");
+    bump.push(("crates/b/Cargo.toml", manifest("a.workspace = true\n")));
+    bump.push(("crates/b/src/lib.rs", "\n".into()));
+    bump.push(("CHANGELOG.md", "0.6.0\n".into()));
+    bump.push((
+        "Cargo.lock",
+        glob_lock("0.6.0", &local_block("0.6.0", &["a"])),
+    ));
+    let (code, out) = run("bump", bump);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("0 policy, 0 generated (ignored), 2 other, 2 version-only (ignored), 0 owning spec (ignored), 2 new crate (ignored)"),
+        "{out}"
+    );
+
+    // A new crate beside the spec that claims its directory: no policy path
+    // remains, so the spec is other and the guard exits 0.
+    let (code, out) = run(
+        "claimed",
+        vec![
+            ("crates/b/Cargo.toml", manifest("a.workspace = true\n")),
+            ("crates/b/src/lib.rs", "\n".into()),
+            lock(local_block("0.5.0", &["a"])),
+            (
+                "specs/9-x/spec.md",
+                "---\nid: \"9-x\"\nestablishes:\n  - { kind: directory, path: \"crates/b/\" }\n---\n".into(),
+            ),
+        ],
+    );
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("0 policy, 0 generated (ignored), 2 other"),
+        "{out}"
+    );
 }
 
 #[test]
