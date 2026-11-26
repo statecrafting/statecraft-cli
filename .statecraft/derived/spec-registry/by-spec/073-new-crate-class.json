@@ -1,0 +1,93 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class",
+      "072-self-pin-and-owning-spec"
+    ],
+    "amendsVerification": [
+      "071-version-only-cargo-class"
+    ],
+    "created": "2026-11-24",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "071-version-only-cargo-class",
+      "072-self-pin-and-owning-spec"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "073-new-crate-class",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-new-crate-manifest",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A Cargo.toml that the merge base does not hold, whose directory holds no path at the merge base, and whose every table and dependency line is one section 3.1 admits, is new-crate; the guard counts it in neither policy nor other."
+      },
+      {
+        "anchor": "3-2-the-new-crate-lockfile",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A Cargo.lock that both revisions hold is new-crate when, after revision 27's mask, its header and every block with a source are unchanged, no sourceless block is removed, each existing sourceless block differs at most in its dependencies list, and each added block is sourceless and named by a new-crate manifest of this change."
+      },
+      {
+        "anchor": "3-3-what-stays-policy",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Anything section 3.1 or 3.2 does not admit keeps the file policy: a registry, git or alternate-registry dependency, a new or changed package with a source, a workspace, patch, replace or profile table, a links key, a dependency written in a shape the guard does not recognise, a reused directory, and a path git quotes."
+      },
+      {
+        "anchor": "3-4-exits-report-and-the-owning-spec",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The guard's exits and its merge-base comparison are spec 044's; a new-crate path is excluded from the policy paths an owning spec may name; its summary line also counts the new-crate paths."
+      }
+    ],
+    "sectionDigests": {
+      "073-setup-profile-revision-29-the-policy-isolation-guard-ignores-a-new-workspace-crate-that-adds-no-dependency": "aef8bce3fb160c918c7a15eab04161b84470b9d29e18a3cf99bf49a881d382d5",
+      "1-purpose": "c76f23bae7473fd2a6e265905797f24879f5916ef70cbf59ca37e62a50ea7b56",
+      "2-territory": "42ca9f7f62823531e381e3777b34eceec14ede5e0c0622f3237532269fad2584",
+      "3-1-the-new-crate-manifest": "db19c4047e4aa28965bbd3e2362f8daa71757f64145d75e224fc2d159703aa28",
+      "3-2-the-new-crate-lockfile": "5dd560f7fc3003aab8786f4340a99947cd9aa4b997fe5637161c31af77ee0535",
+      "3-3-what-stays-policy": "4eb50476f651db226fad1160347891ff0d1a1c4ec888aaff69df5e00f9a686ba",
+      "3-4-exits-report-and-the-owning-spec": "cbdc046e5228a048b77f4346bf9ab7f7fb90963af838881bcf8478ab51b9573f",
+      "3-5-observable-cases": "be6907dae99976958e2a1147113155c715bb755f29c21c6d93e56e7fde120bd4",
+      "3-behavior": "c0205c7c2b4df1c404a2b8cb9ebfdd9e5f1b3bc3a232caa14230a7c9c27e1cdd",
+      "4-out-of-scope": "3301ada52cd5ec896e6e67da6d7f8f951729c699b7afcb52df942b114899d3aa",
+      "5-resolved-decisions": "a1770ef1dffbf16470963ca8e0c5586c490ad0272dc42fbf720f7da7587fae5c",
+      "verification": "26af24cce503e0f36f1bf8c87b8d5223b067c416e13c47ccface4f7a7910dc48"
+    },
+    "sectionHeadings": [
+      "073: Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The new-crate manifest",
+      "3.2 The new-crate lockfile",
+      "3.3 What stays policy",
+      "3.4 Exits, report and the owning spec",
+      "3.5 Observable cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/073-new-crate-class/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 044 section 3.3, specs 071 and 072, and spec 002's setup profile. A workspace whose members are a glob picks up a new crate's Cargo.toml the moment it lands, so the manifest cannot land before its sources (the build breaks) and cannot land with them (the guard reads policy plus other). Every new crate has needed an admin merge. Revision 29 adds a class, new-crate: a Cargo.toml in a directory that is new at the head, whose every dependency inherits from the workspace or is a path to a workspace crate, and a Cargo.lock whose only change is that crate's sourceless entry and the dependency lists that reference it. Like generated paths it is ignored. Any added, removed or changed registry or git package keeps the file policy, so a dependency still lands alone.\n",
+    "title": "Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency"
+  },
+  "shardHash": "9316c8975f1afbc451bd72fbd7be9b855e753a0e056375038ddf12cd485143f4",
+  "specVersion": "1.11.0"
+}
