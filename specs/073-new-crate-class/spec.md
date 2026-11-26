@@ -2,7 +2,7 @@
 id: "073-new-crate-class"
 title: "Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-24"
 summary: >
   Amends spec 044 section 3.3, specs 071 and 072, and spec 002's setup

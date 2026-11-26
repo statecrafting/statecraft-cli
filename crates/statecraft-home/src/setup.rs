@@ -36,7 +36,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 28;
+pub const REVISION: u32 = 29;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -140,6 +140,10 @@ pub const VERSION_ONLY_SINCE: u32 = 27;
 /// spec-spine.toml and the spec.md that owns a changed policy file, and whose
 /// remote obligations no longer ask for branches up to date (spec 072).
 pub const OWNING_SPEC_SINCE: u32 = 28;
+/// The revision whose policy-isolation guard ignores a new workspace crate
+/// that adds no dependency: its Cargo.toml and its sourceless Cargo.lock
+/// entry (spec 073).
+pub const NEW_CRATE_SINCE: u32 = 29;
 /// What `ci.code.free_disk` removes: preinstalled toolchains a Rust build
 /// never reads (spec 069 section 3.2). Fixed by the profile.
 pub const FREE_DISK_COMMAND: &str = "sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true";
@@ -502,6 +506,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 26: every finding of the AI review carries a severity (low, medium or high) and a category (correctness, security, authority, ratification or other), a missing or unknown one read as high, and an id, the first twelve hex digits of the sha256 of its path, line and summary; a pull request whose findings are all low and other, each answered by a `Review note (<sha8>): <id>` line of its body for that head, last edited by its author or by someone with write access, needs no owner exception, in the pull request and in the merge queue; statecraft-ci also runs on an edited pull request, and keeps the review recorded for that head, base and pull request rather than reviewing again (spec 068)".to_string(),
         "revision 27: the policy-isolation guard gives a Cargo.toml or Cargo.lock a fourth class, version-only, when both revisions hold it and it is unchanged once every workspace package's version is masked (Cargo.toml's [package] or [workspace.package] version and the version of an inline table that also names a path; Cargo.lock's version of a [[package]] without a source); like generated paths it is ignored, so a release bump beside its changelog and re-blessed fixtures is one pull request, while any dependency, source or lockfile-format change keeps the file policy (spec 071)".to_string(),
         "revision 28: the policy-isolation guard ignores spec-spine.toml as version-only when both revisions hold it, its only change is required_version, and the head pins the version its root Cargo.toml declares for the workspace (a repository that pins itself), and ignores a spec.md whose front matter names, quoted, a policy path the change also changes (the owning spec the coupling gate requires beside it); a consumer's pin move and every other path keep their class. The obligations no longer ask for branches up to date, and the gate's comments no longer assume merge commits (spec 072)".to_string(),
+        "revision 29: the policy-isolation guard ignores, as new-crate, a Cargo.toml in a directory the merge base holds nothing in whose every table is one a crate needs (no workspace, patch, replace or profile table, no links key) and whose every dependency is a single line inheriting from the workspace or a path to a workspace crate, and a Cargo.lock whose header and every block with a source are unchanged after revision 27's mask, whose existing sourceless blocks differ at most in their dependency lists, and whose added blocks are sourceless and named by such a manifest; a new crate that adds no package lands in one pull request, and any registry or git package change keeps the file policy (spec 073)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
