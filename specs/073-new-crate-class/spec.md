@@ -213,17 +213,15 @@ workspace root and one existing crate that depends on one registry package.
 
 ## 5. Resolved decisions
 
-**2026-11-24: owner direction.** The owner asked for a draft change so that a
-new workspace crate lands in one pull request without an admin merge, keeping
-dependency review isolated, with aicortex #126 and #127 as the evidence. This
-spec is that draft. Ratification is the owner's act; an implementation
-follows only once it is approved.
+**2026-11-24: scope.** A new workspace crate lands in one pull request without
+an admin merge, and dependency review stays isolated: the exemption covers a
+crate that adds no package, and every registry or git change remains policy.
 
-**The lockfile is the backstop, the manifest the first test.** A manifest can
-only state requirements; the lockfile states what cargo resolved. Requiring
-both means a manifest that slips past 3.1 through an inherited but unused
-declaration, a feature that enables a dependency's optional package, or a
-path to a crate outside the workspace still fails on the lock, because each
+**2026-11-24: the lockfile is the backstop, the manifest the first test.** A
+manifest can only state requirements; the lockfile states what cargo resolved.
+Requiring both means a manifest that slips past 3.1 through an inherited but
+unused declaration, a feature that enables a dependency's optional package, or
+a path to a crate outside the workspace still fails on the lock, because each
 of those adds a block with a source.
 
 ## Verification
