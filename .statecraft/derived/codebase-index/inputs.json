@@ -16,7 +16,7 @@
       "contentHash": "eafa127b7b1ceef24840bccaabf37089251f7a38ceb97bf66a97577df2144bdb"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "137603abf7f4b3ee93121fb1c4288615391bd32d82c192bf2b6939e892144b2f"
+      "contentHash": "9d1d393c53fb4a24308914b267bf0da5727e3e0a5ef8e5ad0e1e2c476432ee32"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "25804a34fd85499417dd5f7002cced0b588cefb581606f8e8235bbf827deeb9e"
@@ -100,22 +100,22 @@
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
     "scripts/statecraft/ai-review.sh": {
-      "contentHash": "c010f98615a08c93222ee5429e6e9c0b9bb1ce0585fb87d79f20fe2475a21d77"
+      "contentHash": "c3077dc84c94384e450e68e6e5c6a496c5cfaf4fb3e38d7c7062bdb63d34cb73"
     },
     "scripts/statecraft/ci-gate.sh": {
-      "contentHash": "e6b27b4952607c8a3d25bdb9d7b94372466d428eb97321fd50bbf5902a0bb9ff"
+      "contentHash": "ecb94afb9aee3b9bc4d8a4af41c81c1d3080c773d25dfbebf4aea39c472d5ba7"
     },
     "scripts/statecraft/gate.sh": {
-      "contentHash": "2149c88bae439866a90ddaf5980af3e29a05db06dba51d8b10998f9888a42381"
+      "contentHash": "aadf9c99d56c90ed44b6d97c4389af560315b3fff87c599ddd28538c79beca67"
     },
     "scripts/statecraft/guard-policy-files.sh": {
-      "contentHash": "1b6b28dc3452b62f33167d5111f1300617176fc08d1e9603d623aff25685d36d"
+      "contentHash": "2032975245eeb1191fcba014205ec039d2b42bd3c7176cc45d50ffac7c38a872"
     },
     "scripts/statecraft/install-spec-spine.sh": {
-      "contentHash": "5506048307fad7d992cfbd60354b9b9d2ce6949661772510219b2d4c1cb0fa8b"
+      "contentHash": "84b47267a11b215a4f4b2757d562a1d70e31f9b24cb53683ecfee42bea7e01e9"
     },
     "scripts/statecraft/verify-action-pins.sh": {
-      "contentHash": "958e75ff55fc7a808ad877b4a828259c3b4b89c2a9a95347eddecc51c1366060"
+      "contentHash": "8aebf38c047442ca564988ae1df3ec3c74faf028d8c8dcd6da6c759bbd9139de"
     },
     "spec-spine.toml": {
       "contentHash": "af59e17ab20a93f015369890a862b58e96577009d2b5a98d5d256c55ef067c42"
