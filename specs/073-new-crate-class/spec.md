@@ -226,6 +226,12 @@ unused declaration, a feature that enables a dependency's optional package, or
 a path to a crate outside the workspace still fails on the lock, because each
 of those adds a block with a source.
 
+**2026-11-26: a dependency line is matched whole.** Section 3.1 lists the
+admitted shapes and is silent on a trailing comment, so a dependency line
+with one, a version requirement holding a comma, or a key written with an
+underscore (`default_features`) is not admitted and keeps the manifest
+policy. Matching the whole line keeps the class textual and closed.
+
 ## Verification
 
 Ratified by the owner on 2026-11-26. Each line is one command.
