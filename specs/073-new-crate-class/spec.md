@@ -21,6 +21,8 @@ amends:
   - "044-supply-chain-profile"
   - "071-version-only-cargo-class"
   - "072-self-pin-and-owning-spec"
+amends_verification:
+  - "071-version-only-cargo-class"
 extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:

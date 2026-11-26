@@ -6,6 +6,9 @@
       "071-version-only-cargo-class",
       "072-self-pin-and-owning-spec"
     ],
+    "amendsVerification": [
+      "071-version-only-cargo-class"
+    ],
     "created": "2026-11-24",
     "declaresAcceptance": true,
     "dependsOn": [
@@ -85,6 +88,6 @@
     "summary": "Amends spec 044 section 3.3, specs 071 and 072, and spec 002's setup profile. A workspace whose members are a glob picks up a new crate's Cargo.toml the moment it lands, so the manifest cannot land before its sources (the build breaks) and cannot land with them (the guard reads policy plus other). Every new crate has needed an admin merge. Revision 29 adds a class, new-crate: a Cargo.toml in a directory that is new at the head, whose every dependency inherits from the workspace or is a path to a workspace crate, and a Cargo.lock whose only change is that crate's sourceless entry and the dependency lists that reference it. Like generated paths it is ignored. Any added, removed or changed registry or git package keeps the file policy, so a dependency still lands alone.\n",
     "title": "Setup profile revision 29: the policy-isolation guard ignores a new workspace crate that adds no dependency"
   },
-  "shardHash": "06112e213201a78269e1a785c6d4d808cbec6f9eb90405f4d7d882522242e1bf",
+  "shardHash": "9316c8975f1afbc451bd72fbd7be9b855e753a0e056375038ddf12cd485143f4",
   "specVersion": "1.11.0"
 }
