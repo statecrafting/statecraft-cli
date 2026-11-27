@@ -234,6 +234,10 @@ requirement holding a comma, or a key written with an underscore
 (`default_features`) is not admitted and keeps the manifest policy. Matching
 the whole line keeps the class textual and closed.
 
+**2026-11-26: implementation complete.** The owner directed the move to
+`complete` on 2026-11-26, once revision 29 was rendered and this repository
+had adopted it, so no part of the specified behavior remains to build.
+
 ## Verification
 
 Ratified by the owner on 2026-11-26. Each line is one command.
